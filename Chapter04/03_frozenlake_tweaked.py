@@ -9,15 +9,16 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import matplotlib.pyplot as plt
+import numpy as np
 
+# 定义常量
+HIDDEN_SIZE = 128  # 神经网络隐藏层大小
+BATCH_SIZE = 100  # 每批次的训练数据量
+PERCENTILE = 30  # 用于筛选精英样本的百分位数
+GAMMA = 0.9  # 折扣因子，用于计算未来奖励的现值
 
-HIDDEN_SIZE = 128
-BATCH_SIZE = 100
-PERCENTILE = 30
-GAMMA = 0.9
-
-
-
+# 定义一个包装器，将离散的观察空间转换为 one-hot 编码
 class DiscreteOneHotWrapper(gym.ObservationWrapper):
     def __init__(self, env: gym.Env):
         super(DiscreteOneHotWrapper, self).__init__(env)
@@ -32,32 +33,33 @@ class DiscreteOneHotWrapper(gym.ObservationWrapper):
         res[observation] = 1.0
         return res
 
-
+# 定义神经网络模型
 class Net(nn.Module):
     def __init__(self, obs_size: int, hidden_size: int,
                  n_actions: int):
         super(Net, self).__init__()
         self.net = nn.Sequential(
-            nn.Linear(obs_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, n_actions)
+            nn.Linear(obs_size, hidden_size),  # 输入层到隐藏层
+            nn.ReLU(),  # 激活函数
+            nn.Linear(hidden_size, n_actions)  # 隐藏层到输出层
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
 
-
+# 定义数据类，用于存储每一步的观察和动作
 @dataclass
 class EpisodeStep:
     observation: np.ndarray
     action: int
 
+# 定义数据类，用于存储整个回合的奖励和步骤
 @dataclass
 class Episode:
     reward: float
     steps: tt.List[EpisodeStep]
 
-
+# 生成批次数据，用于训练
 def iterate_batches(env: gym.Env, net: Net, batch_size: int) -> \
         tt.Generator[tt.List[Episode], None, None]:
     batch = []
@@ -85,7 +87,7 @@ def iterate_batches(env: gym.Env, net: Net, batch_size: int) -> \
                 batch = []
         obs = next_obs
 
-
+# 筛选精英样本，用于训练
 def filter_batch(batch: tt.List[Episode], percentile: float) -> \
         tt.Tuple[tt.List[Episode], tt.List[np.ndarray], tt.List[int], float]:
     reward_fun = lambda s: s.reward * (GAMMA ** len(s.steps))
@@ -104,22 +106,22 @@ def filter_batch(batch: tt.List[Episode], percentile: float) -> \
 
     return elite_batch, train_obs, train_act, reward_bound
 
-
+# 主函数
 if __name__ == "__main__":
-    random.seed(12345)
-    env = DiscreteOneHotWrapper(gym.make("FrozenLake-v1"))
-    obs_size = env.observation_space.shape[0]
-    n_actions = env.action_space.n
+    random.seed(12345)  # 设置随机种子，确保结果可复现
+    env = DiscreteOneHotWrapper(gym.make("FrozenLake-v1"))  # 创建环境并应用包装器
+    obs_size = env.observation_space.shape[0]  # 获取观察空间的大小
+    n_actions = env.action_space.n  # 获取动作空间的大小
 
-    net = Net(obs_size, HIDDEN_SIZE, n_actions)
-    objective = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(params=net.parameters(), lr=0.001)
-    writer = SummaryWriter(comment="-frozenlake-tweaked")
+    net = Net(obs_size, HIDDEN_SIZE, n_actions)  # 初始化神经网络
+    objective = nn.CrossEntropyLoss()  # 定义损失函数
+    optimizer = optim.Adam(params=net.parameters(), lr=0.001)  # 定义优化器
+    writer = SummaryWriter(comment="-frozenlake-tweaked")  # 初始化 TensorBoard 记录器
 
     full_batch = []
     for iter_no, batch in enumerate(iterate_batches(env, net, BATCH_SIZE)):
         reward_mean = float(np.mean(list(map(lambda s: s.reward, batch))))
-        full_batch, obs, acts, reward_bound = filter_batch(full_batch + batch, PERCENTILE)
+        full_batch, obs, acts, reward_bound = filter_batch(full_batch + batch, PERCENTILE)  # 这里 full_batch 就是保留的精英样本
         if not full_batch:
             continue
         obs_v = torch.FloatTensor(np.vstack(obs))

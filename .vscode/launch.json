@@ -1,0 +1,30 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python-Atari GAN",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/Chapter03/03_atari_gan.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "cross-entropy model",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/Chapter04/03_frozenlake_tweaked.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+        }
+    ]
+}
