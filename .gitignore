@@ -5,3 +5,6 @@ saves
 video
 __pycache__
 .ipynb_checkpoints/
+.hypothesis/
+.vscode/
+*.pth
